@@ -3,4 +3,10 @@ name = "mapjson"
 version = "0.1.0"
 edition = "2024"
 
+description = "A Map and Json converter based on the standard library design."
+repository = "https://github.com/mulingya/mapjson"
+keywords = ["json", "serialization", "deserialization"]
+license = "MIT"
+readme = "README.md"
+
 [dependencies]
