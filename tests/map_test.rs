@@ -67,6 +67,18 @@ fn nested_format() {
 }
 
 #[test]
+fn number() {
+    let mut map = Map::new();
+    map.insert("a".to_string(), Value::F64(3.14));
+    map.insert("b".to_string(), Value::I64(567));
+    // 由于rust标准库的hashmap的key排序取决于随机种子, 所以每次遍历的key顺序不一定相同
+    let case1 = r#"{"a":3.14,"b":567}"#;
+    let case2 = r#"{"b":567,"a":3.14}"#;
+    let actual = map.to_json();
+    assert!(case1 == actual || case2 == actual);
+}
+
+#[test]
 fn parse() {
     let json =
         r#"{"a":null,"b":true,"c":3.14,"d":"hello","e":["hi","china"],"f":{"a1":11,"b1":22}}"#;

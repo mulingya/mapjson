@@ -93,11 +93,16 @@ impl JsonWriter {
         writer.push_str(val.to_string().as_str());
     }
 
+    fn write_i64(&self, writer: &mut String, val: i64) {
+        writer.push_str(val.to_string().as_str());
+    }
+
     fn write_value(&self, writer: &mut String, value: &Value, indentation_level: usize) {
         match *value {
             Value::Null => self.write_null(writer),
             Value::Bool(val) => self.write_bool(writer, val),
             Value::F64(val) => self.write_f64(writer, val),
+            Value::I64(val) => self.write_i64(writer, val),
             Value::String(ref val) => self.write_string(writer, val),
             Value::Vec(ref val) => self.write_vec(writer, val, indentation_level),
             Value::Object(ref val) => self.write_struct(writer, val, indentation_level),

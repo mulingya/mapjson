@@ -103,8 +103,15 @@ impl JsonReader {
             JsonToken::True => Ok(Value::Bool(true)),
             JsonToken::StringValue(s) => Ok(Value::String(s.to_string())),
             JsonToken::Number(num) => {
-                let value = self.safe_parse_f64(num.as_str())?;
-                Ok(Value::F64(value))
+                let s = num.as_str();
+                if s.parse::<i64>().is_ok() {
+                    Ok(Value::I64(num.parse::<i64>().unwrap()))
+                } else if s.parse::<f64>().is_ok() {
+                    let value = self.safe_parse_f64(num.as_str())?;
+                    Ok(Value::F64(value))
+                } else {
+                    Err(format!("Invalid number: {}", num))
+                }
             }
             _ => Err(format!(
                 "An error Token occurred while parsing single value: {:?}",
@@ -154,7 +161,7 @@ mod test {
 
         assert!(map.get("a").unwrap().is_null());
         assert_eq!(map.get("b").unwrap().as_bool().unwrap(), false);
-        assert_eq!(map.get("c").unwrap().as_f64().unwrap(), 618.);
+        assert_eq!(map.get("c").unwrap().as_i64().unwrap(), 618);
         assert_eq!(map.get("d").unwrap().as_string().unwrap(), "hello");
         let vec = map.get("e").unwrap().as_vec().unwrap();
         assert_eq!(vec.len(), 2);
@@ -162,8 +169,8 @@ mod test {
         assert_eq!(vec[1].as_f64().unwrap(), 6.18);
         let obj = map.get("f").unwrap().as_object().unwrap();
         assert_eq!(obj.len(), 2);
-        assert_eq!(obj.get("a1").unwrap().as_f64().unwrap(), 11.);
-        assert_eq!(obj.get("b1").unwrap().as_f64().unwrap(), 22.);
+        assert_eq!(obj.get("a1").unwrap().as_i64().unwrap(), 11);
+        assert_eq!(obj.get("b1").unwrap().as_i64().unwrap(), 22);
     }
 
     #[test]
@@ -199,24 +206,35 @@ mod test {
     }
 
     #[test]
+    fn string_to_i64_valid() {
+        let case1 = ("0", 0);
+        let case2 = ("-0", 0);
+        let case3 = ("1", 1);
+        let case4 = ("-1", -1);
+        let case5 = ("9223372036854775807", 9223372036854775807);
+        let case6 = ("-9223372036854775808", -9223372036854775808);
+
+        assert_string_to_i64_valid(case1.0, case1.1);
+        assert_string_to_i64_valid(case2.0, case2.1);
+        assert_string_to_i64_valid(case3.0, case3.1);
+        assert_string_to_i64_valid(case4.0, case4.1);
+        assert_string_to_i64_valid(case5.0, case5.1);
+        assert_string_to_i64_valid(case6.0, case6.1);
+    }
+
+    #[test]
     fn string_to_f64_valid() {
-        let case1 = ("0", 0.);
-        let case2 = ("-0", 0.);
-        let case3 = ("1", 1.);
-        let case4 = ("-1", -1.);
-        let case5 = ("9223372036854775807", 9223372036854775807.);
-        let case6 = ("-9223372036854775808", -9223372036854775808.);
-        let case7 = ("1.0000000000000000000000001", 1.);
-        let case8 = ("1e1", 10.);
-        let case9 = ("1e01", 10.); // 指数中允许使用前导小数
-        let case10 = ("1E1", 10.);
-        let case11 = ("-1e1", -10.);
-        let case12 = ("1.5e1", 15.);
-        let case13 = ("-1.5e1", -15.);
-        let case14 = ("15e-1", 1.5);
-        let case15 = ("-15e-1", -1.5);
-        let case16 = ("1.79769e308", 1.79769e308);
-        let case17 = ("-1.79769e308", -1.79769e308);
+        let case1 = ("1.0000000000000000000000001", 1.);
+        let case2 = ("1e1", 10.);
+        let case3 = ("1e01", 10.); // 指数中允许使用前导小数
+        let case4 = ("1E1", 10.);
+        let case5 = ("-1e1", -10.);
+        let case6 = ("1.5e1", 15.);
+        let case7 = ("-1.5e1", -15.);
+        let case8 = ("15e-1", 1.5);
+        let case9 = ("-15e-1", -1.5);
+        let case10 = ("1.79769e308", 1.79769e308);
+        let case11 = ("-1.79769e308", -1.79769e308);
 
         assert_string_to_f64_valid(case1.0, case1.1);
         assert_string_to_f64_valid(case2.0, case2.1);
@@ -229,16 +247,10 @@ mod test {
         assert_string_to_f64_valid(case9.0, case9.1);
         assert_string_to_f64_valid(case10.0, case10.1);
         assert_string_to_f64_valid(case11.0, case11.1);
-        assert_string_to_f64_valid(case12.0, case12.1);
-        assert_string_to_f64_valid(case13.0, case13.1);
-        assert_string_to_f64_valid(case14.0, case14.1);
-        assert_string_to_f64_valid(case15.0, case15.1);
-        assert_string_to_f64_valid(case16.0, case16.1);
-        assert_string_to_f64_valid(case17.0, case17.1);
     }
 
     #[test]
-    fn string_to_f64_invalid() {
+    fn string_to_number_invalid() {
         let case1 = "+0";
         let case2 = "00";
         let case3 = "-00";
@@ -248,20 +260,35 @@ mod test {
         let case7 = "-1.7977e308";
         let case8 = "1e309";
 
-        assert_string_to_f64_invalid(case1);
-        assert_string_to_f64_invalid(case2);
-        assert_string_to_f64_invalid(case3);
-        assert_string_to_f64_invalid(case4);
-        assert_string_to_f64_invalid(case5);
-        assert_string_to_f64_invalid(case6);
-        assert_string_to_f64_invalid(case7);
-        assert_string_to_f64_invalid(case8);
+        assert_string_to_number_invalid(case1);
+        assert_string_to_number_invalid(case2);
+        assert_string_to_number_invalid(case3);
+        assert_string_to_number_invalid(case4);
+        assert_string_to_number_invalid(case5);
+        assert_string_to_number_invalid(case6);
+        assert_string_to_number_invalid(case7);
+        assert_string_to_number_invalid(case8);
+    }
+
+    #[test]
+    fn parse_number() {
+        let json = r#"{"a1": 3.14, "a2": 789}"#;
+        let map = parse_to_map(json);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get("a1").unwrap().as_f64().unwrap(), 3.14f64);
+        assert_eq!(map.get("a2").unwrap().as_i64().unwrap(), 789i64);
     }
 
     fn assert_string_to_f64_valid(left: &str, right: f64) {
         let json = format!("{{\"key_f64\":{}}}", left);
         let map = parse_to_map(json.as_str());
         assert_eq!(map.get("key_f64").unwrap().as_f64().unwrap(), right);
+    }
+
+    fn assert_string_to_i64_valid(left: &str, right: i64) {
+        let json = format!("{{\"key_i64\":{}}}", left);
+        let map = parse_to_map(json.as_str());
+        assert_eq!(map.get("key_i64").unwrap().as_i64().unwrap(), right);
     }
 
     fn parse_to_map(json: &str) -> Map {
@@ -273,8 +300,8 @@ mod test {
         map
     }
 
-    fn assert_string_to_f64_invalid(s: &str) {
-        let json = format!("{{\"key_f64\":{}}}", s);
+    fn assert_string_to_number_invalid(s: &str) {
+        let json = format!("{{\"key_number\":{}}}", s);
         let result = parse_to_map_err(json.as_str());
 
         assert!(matches!(result, Err(_)));

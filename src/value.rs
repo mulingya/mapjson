@@ -6,6 +6,7 @@ pub enum Value {
     Null,
     Bool(bool),
     F64(f64),
+    I64(i64),
     String(String),
     Vec(Vec<Value>),
     Object(Map),
@@ -26,6 +27,13 @@ impl Value {
     pub fn as_f64(&self) -> Option<f64> {
         match *self {
             Value::F64(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        match *self {
+            Value::I64(n) => Some(n),
             _ => None,
         }
     }
