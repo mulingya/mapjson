@@ -102,17 +102,7 @@ impl JsonReader {
             JsonToken::False => Ok(Value::Bool(false)),
             JsonToken::True => Ok(Value::Bool(true)),
             JsonToken::StringValue(s) => Ok(Value::String(s.to_string())),
-            JsonToken::Number(num) => {
-                let s = num.as_str();
-                if s.parse::<i64>().is_ok() {
-                    Ok(Value::I64(num.parse::<i64>().unwrap()))
-                } else if s.parse::<f64>().is_ok() {
-                    let value = self.safe_parse_f64(num.as_str())?;
-                    Ok(Value::F64(value))
-                } else {
-                    Err(format!("Invalid number: {}", num))
-                }
-            }
+            JsonToken::Number(num) => self.parse_number(num),
             _ => Err(format!(
                 "An error Token occurred while parsing single value: {:?}",
                 token
@@ -120,17 +110,23 @@ impl JsonReader {
         }
     }
 
-    // 将字符串安全地转换成f64类型，如果转换失败则抛出错误信息.
-    fn safe_parse_f64(&self, s: &str) -> Result<f64, String> {
-        s.parse::<f64>()
-            .map_err(|e| format!("Parse error: {}", e))
-            .and_then(|num| {
-                if num.is_nan() || num.is_infinite() {
-                    Err("Reject special value".to_string())
-                } else {
-                    Ok(num)
-                }
-            })
+    fn parse_number(&self, s: &str) -> Result<Value, String> {
+        let n = s.parse::<i64>();
+        if n.is_ok() {
+            return Ok(Value::I64(n.unwrap()));
+        }
+
+        let n = s.parse::<f64>();
+        if n.is_ok() {
+            let val = n.unwrap();
+            return if val.is_nan() || val.is_infinite() {
+                Err("Reject special value".to_string())
+            } else {
+                Ok(Value::F64(val))
+            };
+        }
+
+        Err(format!("Invalid number: {}", s))
     }
 }
 
